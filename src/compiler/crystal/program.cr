@@ -1,4 +1,4 @@
-require "llvm"
+require "../../../llvm"
 require "./types"
 
 module Crystal

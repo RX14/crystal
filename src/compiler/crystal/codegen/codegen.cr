@@ -1,4 +1,4 @@
-require "llvm"
+require "../../../llvm"
 require "../syntax/parser"
 require "../syntax/visitor"
 require "../semantic"
