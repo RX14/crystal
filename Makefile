@@ -117,7 +117,7 @@ $(LLVM_EXT_OBJ): $(LLVM_EXT_DIR)/llvm_ext.cc
 	$(CXX) -c $(CXXFLAGS) -o $@ $< `$(LLVM_CONFIG) --cxxflags`
 
 $(LIB_CRYSTAL_TARGET): $(LIB_CRYSTAL_OBJS)
-	$(AR) -rcs $@ $^
+	$(AR) $(ARFLAGS) -rcs $@ $^
 
 .PHONY: clean
 clean: ## Clean up built directories and files
