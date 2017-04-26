@@ -43,6 +43,7 @@ LIB_CRYSTAL_SOURCES = $(shell find src/ext -name '*.c')
 LIB_CRYSTAL_OBJS = $(subst .c,.o,$(LIB_CRYSTAL_SOURCES))
 LIB_CRYSTAL_TARGET = src/ext/libcrystal.a
 DEPS = $(LLVM_EXT_OBJ) $(LIB_CRYSTAL_TARGET)
+ARFLAGS=
 CFLAGS += -fPIC $(if $(debug),-g -O0)
 CXXFLAGS += $(if $(debug),-g -O0)
 
