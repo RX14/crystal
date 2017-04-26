@@ -26,8 +26,8 @@ junit_output ?= ## Directory to output junit results
 O := .build
 SOURCES := $(shell find src -name '*.cr')
 SPEC_SOURCES := $(shell find spec -name '*.cr')
-FLAGS := $(if $(release),--release )$(if $(stats),--stats )$(if $(progress),--progress )$(if $(threads),--threads $(threads) )$(if $(debug),-d )
-SPEC_FLAGS := $(if $(verbose),-v )$(if $(junit_output),--junit_output $(junit_output) )
+CRYSTAL_FLAGS += $(if $(release),--release )$(if $(stats),--stats )$(if $(progress),--progress )$(if $(threads),--threads $(threads) )$(if $(debug),-d )
+SPEC_FLAGS += $(if $(verbose),-v )$(if $(junit_output),--junit_output $(junit_output) )
 EXPORTS := $(if $(release),,CRYSTAL_CONFIG_PATH=`pwd`/src)
 SHELL = bash
 LLVM_CONFIG_FINDER := \
@@ -102,19 +102,19 @@ libcrystal: $(LIB_CRYSTAL_TARGET)
 
 $(O)/all_spec: $(DEPS) $(SOURCES) $(SPEC_SOURCES)
 	@mkdir -p $(O)
-	$(BUILD_PATH) ./bin/crystal build $(FLAGS) -o $@ spec/all_spec.cr
+	$(BUILD_PATH) ./bin/crystal build $(CRYSTAL_FLAGS) -o $@ spec/all_spec.cr
 
 $(O)/std_spec: $(DEPS) $(SOURCES) $(SPEC_SOURCES)
 	@mkdir -p $(O)
-	$(BUILD_PATH) ./bin/crystal build $(FLAGS) -o $@ spec/std_spec.cr
+	$(BUILD_PATH) ./bin/crystal build $(CRYSTAL_FLAGS) -o $@ spec/std_spec.cr
 
 $(O)/compiler_spec: $(DEPS) $(SOURCES) $(SPEC_SOURCES)
 	@mkdir -p $(O)
-	$(BUILD_PATH) ./bin/crystal build $(FLAGS) -o $@ spec/compiler_spec.cr
+	$(BUILD_PATH) ./bin/crystal build $(CRYSTAL_FLAGS) -o $@ spec/compiler_spec.cr
 
 $(O)/crystal: $(DEPS) $(SOURCES)
 	@mkdir -p $(O)
-	$(BUILD_PATH) $(EXPORTS) ./bin/crystal build $(FLAGS) -o $@ src/compiler/crystal.cr -D without_openssl -D without_zlib
+	$(BUILD_PATH) $(EXPORTS) ./bin/crystal build $(CRYSTAL_FLAGS) -o $@ src/compiler/crystal.cr -D without_openssl -D without_zlib
 
 $(LLVM_EXT_OBJ): $(LLVM_EXT_DIR)/llvm_ext.cc
 	$(CXX) -c $(CXXFLAGS) -o $@ $< `$(LLVM_CONFIG) --cxxflags`
