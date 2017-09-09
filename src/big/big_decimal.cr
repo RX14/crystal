@@ -10,6 +10,9 @@ require "big_int"
 # the MIT/APACHE -licensed https://github.com/akubera/bigdecimal-rs
 
 class InvalidBigDecimalException < Exception
+  def initialize(big_decimal_str : String, reason : String)
+    super("Invalid BigDecimal: #{big_decimal_str} (#{reason})")
+  end
 end
 
 struct BigDecimal
@@ -20,23 +23,45 @@ struct BigDecimal
   include Comparable(Number)
   include Comparable(BigDecimal)
 
-  private property value : BigInt
-  private property scale : UInt64
-  getter value, scale
+  getter value : BigInt
+  getter scale : UInt64
 
   # Creates a new `BigDecimal` from a `String`.
   #
   # Allows only valid number strings with an optional negative sign.
   def initialize(str : String)
-    # disallow every non-valid string
-    if str !~ /^-?[0-9]+(\.[0-9]+)?$/
-      raise InvalidBigDecimalException.new("Invalid BigDecimal: #{str}")
+    raise InvalidBigDecimalException.new(str, "Zero size") if str.bytesize == 0
+
+    # Check str's validity and find index of .
+    decimal_index = nil
+    str.each_char_with_index do |char, index|
+      case char
+      when '-'
+        if index != 0
+          raise InvalidBigDecimalException.new(str, "Unexpected '-' character")
+        end
+      when '.'
+        if decimal_index
+          raise InvalidBigDecimalException.new(str, "Unexpected '.' character")
+        end
+
+        decimal_index = index
+      when '0'..'9'
+        # Pass
+      else
+        raise InvalidBigDecimalException.new(str, "Unexpected #{char.inspect} character")
+      end
     end
 
-    if str.includes?('.')
-      v1, v2 = str.split('.')
-      @value = "#{v1}#{v2}".to_big_i
-      @scale = v2.size.to_u64
+    if decimal_index
+      value_str = String.build do |builder|
+        # We know this is ASCII, so we can slice by index
+        builder.write(str.to_slice[0, decimal_index])
+        builder.write(str.to_slice[decimal_index + 1, str.bytesize - decimal_index - 1])
+      end
+
+      @value = value_str.to_big_i
+      @scale = (str.bytesize - decimal_index - 1).to_u64
     else
       @value = str.to_big_i
       @scale = 0_u64

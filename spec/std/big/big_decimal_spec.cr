@@ -24,6 +24,18 @@ describe BigDecimal do
     BigDecimal.new("0.0")
               .should eq(BigDecimal.new(BigInt.new(0)))
 
+    BigDecimal.new(".2")
+              .should eq(BigDecimal.new(BigInt.new(2), 1))
+
+    BigDecimal.new("2.")
+              .should eq(BigDecimal.new(BigInt.new(2)))
+
+    BigDecimal.new("-.2")
+              .should eq(BigDecimal.new(BigInt.new(-2), 1))
+
+    BigDecimal.new("-2.")
+              .should eq(BigDecimal.new(BigInt.new(-2)))
+
     BigDecimal.new("-0.1")
               .should eq(BigDecimal.new(BigInt.new(-1), 1))
 
@@ -66,10 +78,6 @@ describe BigDecimal do
 
     expect_raises(InvalidBigDecimalException) do
       BigDecimal.new("1.2.3")
-    end
-
-    expect_raises(InvalidBigDecimalException) do
-      BigDecimal.new(".2")
     end
 
     expect_raises(InvalidBigDecimalException) do
