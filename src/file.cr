@@ -2,18 +2,10 @@ require "crystal/system/file"
 
 class File < IO::FileDescriptor
   # The file/directory separator character. `'/'` in Unix, `'\\'` in Windows.
-  SEPARATOR = {% if flag?(:windows) %}
-    '\\'
-  {% else %}
-    '/'
-  {% end %}
+  SEPARATOR = '/'
 
   # The file/directory separator string. `"/"` in Unix, `"\\"` in Windows.
-  SEPARATOR_STRING = {% if flag?(:windows) %}
-    "\\"
-  {% else %}
-    "/"
-  {% end %}
+  SEPARATOR_STRING = "/"
 
   # :nodoc:
   DEFAULT_CREATE_PERMISSIONS = 0o644
@@ -327,9 +319,7 @@ class File < IO::FileDescriptor
     end
 
     String.build do |str|
-      {% if !flag?(:windows) %}
-        str << SEPARATOR_STRING
-      {% end %}
+      str << SEPARATOR_STRING
       items.join SEPARATOR_STRING, str
     end
   end
@@ -749,26 +739,28 @@ class File < IO::FileDescriptor
     system_truncate(size)
   end
 
-  # Yields an `IO` to read a section inside this file.
-  # Multiple sections can be read concurrently.
-  def read_at(offset, bytesize, &block)
-    self_bytesize = self.size
+  {% unless flag?(:win32) %}
+    # Yields an `IO` to read a section inside this file.
+    # Multiple sections can be read concurrently.
+    def read_at(offset, bytesize, &block)
+      self_bytesize = self.size
 
-    unless 0 <= offset <= self_bytesize
-      raise ArgumentError.new("Offset out of bounds")
+      unless 0 <= offset <= self_bytesize
+        raise ArgumentError.new("Offset out of bounds")
+      end
+
+      if bytesize < 0
+        raise ArgumentError.new("Negative bytesize")
+      end
+
+      unless 0 <= offset + bytesize <= self_bytesize
+        raise ArgumentError.new("Bytesize out of bounds")
+      end
+
+      io = PReader.new(fd, offset, bytesize)
+      yield io ensure io.close
     end
-
-    if bytesize < 0
-      raise ArgumentError.new("Negative bytesize")
-    end
-
-    unless 0 <= offset + bytesize <= self_bytesize
-      raise ArgumentError.new("Bytesize out of bounds")
-    end
-
-    io = PReader.new(fd, offset, bytesize)
-    yield io ensure io.close
-  end
+  {% end %}
 
   def inspect(io)
     io << "#<File:" << @path

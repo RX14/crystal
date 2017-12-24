@@ -1,4 +1,3 @@
-require "file/stat"
 require "c/io"
 
 module Crystal::System::FileDescriptor
@@ -40,11 +39,29 @@ module Crystal::System::FileDescriptor
     raise NotImplementedError.new("Crystal::System::FileDescriptor#system_close_on_exec=") if close_on_exec
   end
 
-  private def system_stat
-    if LibC._fstat64(@fd, out stat) != 0
-      raise Errno.new("Unable to get stat")
+  private def windows_handle
+    ret = LibC._get_osfhandle(@fd)
+    raise Errno.new("_get_osfhandle") if ret == -1
+    LibC::HANDLE.new(ret)
+  end
+
+  private def system_info
+    handle = windows_handle
+
+    case LibC.GetFileType(handle)
+    when LibC::FILE_TYPE_UNKNOWN
+      raise WinError.new("GetFileType")
+    when LibC::FILE_TYPE_PIPE then File::FILE_INFO_PIPE
+    when LibC::FILE_TYPE_CHAR then File::FILE_INFO_CHARDEV
+    when LibC::FILE_TYPE_DISK
+      if LibC.GetFileInformationByHandle(handle, out file_info) == 0
+        raise WinError.new("GetFileInformationByHandle")
+      end
+
+      File.to_file_info(file_info)
+    else
+      raise "BUG: unknown GetFileType result"
     end
-    ::File::Stat.new(stat)
   end
 
   private def system_seek(offset, whence : IO::Seek) : Nil
@@ -94,5 +111,18 @@ module Crystal::System::FileDescriptor
         raise Errno.new("Error closing file")
       end
     end
+  end
+
+  def self.pipe(read_blocking, write_blocking)
+    pipe_fds = uninitialized StaticArray(LibC::Int, 2)
+    if LibC._pipe(pipe_fds, 8192, LibC::O_BINARY) != 0
+      raise Errno.new("Could not create pipe")
+    end
+
+    r = IO::FileDescriptor.new(pipe_fds[0], read_blocking)
+    w = IO::FileDescriptor.new(pipe_fds[1], write_blocking)
+    w.sync = true
+
+    {r, w}
   end
 end

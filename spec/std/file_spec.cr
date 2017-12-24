@@ -126,7 +126,9 @@ describe "File" do
       ex = expect_raises(Errno, /Error determining size/) do
         File.empty?("#{__FILE__}/")
       end
-      ex.errno.should eq(Errno::ENOTDIR)
+      {% unless flag?(:win32) %}
+        ex.errno.should eq(Errno::ENOTDIR)
+      {% end %}
     end
   end
 
@@ -144,19 +146,21 @@ describe "File" do
     end
   end
 
-  describe "executable?" do
-    it "gives false" do
-      File.executable?("#{__DIR__}/data/test_file.txt").should be_false
-    end
+  {% unless flag?(:win32) %}
+    describe "executable?" do
+      it "gives false" do
+        File.executable?("#{__DIR__}/data/test_file.txt").should be_false
+      end
 
-    it "gives false when the file doesn't exist" do
-      File.executable?("#{__DIR__}/data/non_existing_file.txt").should be_false
-    end
+      it "gives false when the file doesn't exist" do
+        File.executable?("#{__DIR__}/data/non_existing_file.txt").should be_false
+      end
 
-    it "gives false when a component of the path is a file" do
-      File.executable?("#{__FILE__}/").should be_false
+      it "gives false when a component of the path is a file" do
+        File.executable?("#{__FILE__}/").should be_false
+      end
     end
-  end
+  {% end %}
 
   describe "readable?" do
     it "gives true" do
@@ -314,7 +318,11 @@ describe "File" do
       begin
         File.write(path, "")
         File.chmod(path, 0o775)
-        File.info(path).permissions.should eq(0o775)
+        {% if flag?(:win32) %}
+          File.info(path).permissions.should eq(0o666)
+        {% else %}
+          File.info(path).permissions.should eq(0o775)
+        {% end %}
       ensure
         File.delete(path) if File.exists?(path)
       end
@@ -325,7 +333,11 @@ describe "File" do
       begin
         Dir.mkdir(path, 0o775)
         File.chmod(path, 0o664)
-        File.info(path).permissions.should eq(0o664)
+        {% if flag?(:win32) %}
+          File.info(path).permissions.should eq(0o777)
+        {% else %}
+          File.info(path).permissions.should eq(0o664)
+        {% end %}
       ensure
         Dir.rmdir(path) if Dir.exists?(path)
       end
@@ -336,7 +348,11 @@ describe "File" do
       begin
         File.write(path, "")
         File.chmod(path, File::Permissions.flags(OwnerAll, GroupAll, OtherExecute, OtherRead))
-        File.info(path).permissions.should eq(0o775)
+        {% if flag?(:win32) %}
+          File.info(path).permissions.should eq(0o666)
+        {% else %}
+          File.info(path).permissions.should eq(0o775)
+        {% end %}
       ensure
         File.delete(path) if File.exists?(path)
       end
@@ -349,7 +365,11 @@ describe "File" do
         File.write(path, "")
         File.symlink(path, link)
         File.chmod(link, 0o775)
-        File.info(link).permissions.should eq(0o775)
+        {% if flag?(:win32) %}
+          File.info(path).permissions.should eq(0o666)
+        {% else %}
+          File.info(link).permissions.should eq(0o775)
+        {% end %}
       ensure
         File.delete(path) if File.exists?(path)
         File.delete(link) if File.symlink?(link)
@@ -373,10 +393,12 @@ describe "File" do
     info.type.should eq(File::Type::Directory)
   end
 
-  it "gets info for a character device" do
-    info = File.info("/dev/null")
-    info.type.should eq(File::Type::CharacterDevice)
-  end
+  {% unless flag?(:win32) %}
+    it "gets info for a character device" do
+      info = File.info("/dev/null")
+      info.type.should eq(File::Type::CharacterDevice)
+    end
+  {% end %}
 
   it "gets info for a symlink" do
     info = File.info("#{__DIR__}/data/symlink.txt", follow_symlinks: false)
@@ -409,7 +431,10 @@ describe "File" do
       tmp.info.modification_time.should be_close(Time.now, 5.seconds)
       File.info(tmp.path).modification_time.should be_close(Time.now, 5.seconds)
     ensure
-      tmp.delete
+      {% unless flag?(:win32) %}
+        # TODO: figure out why this is broken on windows
+        tmp.delete
+      {% end %}
     end
   end
 
@@ -433,7 +458,9 @@ describe "File" do
       ex = expect_raises(Errno, /Error determining size/) do
         File.size("#{__FILE__}/")
       end
-      ex.errno.should eq(Errno::ENOTDIR)
+      {% unless flag?(:win32) %}
+        ex.errno.should eq(Errno::ENOTDIR)
+      {% end %}
     end
   end
 
@@ -474,108 +501,117 @@ describe "File" do
     end
   end
 
-  describe "expand_path" do
-    it "converts a pathname to an absolute pathname" do
-      File.expand_path("").should eq(base)
-      File.expand_path("a").should eq(File.join([base, "a"]))
-      File.expand_path("a", nil).should eq(File.join([base, "a"]))
-    end
+  {% unless flag?(:win32) %}
+    describe "expand_path" do
+      # TODO: compiler bug?
+      base = ::base
+      it "converts a pathname to an absolute pathname" do
+        File.expand_path("").should eq(base)
+        File.expand_path("a").should eq(File.join([base, "a"]))
+        File.expand_path("a", nil).should eq(File.join([base, "a"]))
+      end
 
-    it "converts a pathname to an absolute pathname, Ruby-Talk:18512" do
-      File.expand_path(".a").should eq(File.join([base, ".a"]))
-      File.expand_path("..a").should eq(File.join([base, "..a"]))
-      File.expand_path("a../b").should eq(File.join([base, "a../b"]))
-    end
+      it "converts a pathname to an absolute pathname, Ruby-Talk:18512" do
+        File.expand_path(".a").should eq(File.join([base, ".a"]))
+        File.expand_path("..a").should eq(File.join([base, "..a"]))
+        File.expand_path("a../b").should eq(File.join([base, "a../b"]))
+      end
 
-    it "keeps trailing dots on absolute pathname" do
-      File.expand_path("a.").should eq(File.join([base, "a."]))
-      File.expand_path("a..").should eq(File.join([base, "a.."]))
-    end
+      it "keeps trailing dots on absolute pathname" do
+        File.expand_path("a.").should eq(File.join([base, "a."]))
+        File.expand_path("a..").should eq(File.join([base, "a.."]))
+      end
 
-    it "converts a pathname to an absolute pathname, using a complete path" do
-      File.expand_path("", "#{tmpdir}").should eq("#{tmpdir}")
-      File.expand_path("a", "#{tmpdir}").should eq("#{tmpdir}/a")
-      File.expand_path("../a", "#{tmpdir}/xxx").should eq("#{tmpdir}/a")
-      File.expand_path(".", "#{rootdir}").should eq("#{rootdir}")
-    end
+      it "converts a pathname to an absolute pathname, using a complete path" do
+        File.expand_path("", "#{tmpdir}").should eq("#{tmpdir}")
+        File.expand_path("a", "#{tmpdir}").should eq("#{tmpdir}/a")
+        File.expand_path("../a", "#{tmpdir}/xxx").should eq("#{tmpdir}/a")
+        File.expand_path(".", "#{rootdir}").should eq("#{rootdir}")
+      end
 
-    it "expands a path with multi-byte characters" do
-      File.expand_path("Ångström").should eq("#{base}/Ångström")
-    end
+      it "expands a path with multi-byte characters" do
+        File.expand_path("Ångström").should eq("#{base}/Ångström")
+      end
 
-    it "expands /./dir to /dir" do
-      File.expand_path("/./dir").should eq("/dir")
-    end
+      it "expands /./dir to /dir" do
+        File.expand_path("/./dir").should eq("/dir")
+      end
 
-    it "replaces multiple / with a single /" do
-      File.expand_path("////some/path").should eq("/some/path")
-      File.expand_path("/some////path").should eq("/some/path")
-    end
+      it "replaces multiple / with a single /" do
+        File.expand_path("////some/path").should eq("/some/path")
+        File.expand_path("/some////path").should eq("/some/path")
+      end
 
-    it "expand path with" do
-      File.expand_path("../../bin", "/tmp/x").should eq("/bin")
-      File.expand_path("../../bin", "/tmp").should eq("/bin")
-      File.expand_path("../../bin", "/").should eq("/bin")
-      File.expand_path("../bin", "tmp/x").should eq(File.join([base, "tmp", "bin"]))
-      File.expand_path("../bin", "x/../tmp").should eq(File.join([base, "bin"]))
-    end
+      it "expand path with" do
+        File.expand_path("../../bin", "/tmp/x").should eq("/bin")
+        File.expand_path("../../bin", "/tmp").should eq("/bin")
+        File.expand_path("../../bin", "/").should eq("/bin")
+        File.expand_path("../bin", "tmp/x").should eq(File.join([base, "tmp", "bin"]))
+        File.expand_path("../bin", "x/../tmp").should eq(File.join([base, "bin"]))
+      end
 
-    it "expand_path for commoms unix path  give a full path" do
-      File.expand_path("/tmp/").should eq("/tmp")
-      File.expand_path("/tmp/../../../tmp").should eq("/tmp")
-      File.expand_path("").should eq(base)
-      File.expand_path("./////").should eq(base)
-      File.expand_path(".").should eq(base)
-      File.expand_path(base).should eq(base)
-    end
+      it "expand_path for commoms unix path  give a full path" do
+        File.expand_path("/tmp/").should eq("/tmp")
+        File.expand_path("/tmp/../../../tmp").should eq("/tmp")
+        File.expand_path("").should eq(base)
+        File.expand_path("./////").should eq(base)
+        File.expand_path(".").should eq(base)
+        File.expand_path(base).should eq(base)
+      end
 
-    it "converts a pathname to an absolute pathname, using ~ (home) as base" do
-      File.expand_path("~/").should eq(home)
-      File.expand_path("~/..badfilename").should eq(File.join(home, "..badfilename"))
-      File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(%r{\A//}, "/"))
-      File.expand_path("~/a", "~/b").should eq(File.join(home, "a"))
-      File.expand_path("~").should eq(home)
-      File.expand_path("~", "/tmp/gumby/ddd").should eq(home)
-      File.expand_path("~/a", "/tmp/gumby/ddd").should eq(File.join([home, "a"]))
-    end
-
-    it "converts a pathname to an absolute pathname, using ~ (home) as base (trailing /)" do
-      prev_home = home
-      begin
-        ENV["HOME"] = __DIR__ + "/"
+      it "converts a pathname to an absolute pathname, using ~ (home) as base" do
         File.expand_path("~/").should eq(home)
         File.expand_path("~/..badfilename").should eq(File.join(home, "..badfilename"))
-        File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(%r{\A//}, "/"))
+        File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(\%r(\A//), "/"))
         File.expand_path("~/a", "~/b").should eq(File.join(home, "a"))
         File.expand_path("~").should eq(home)
         File.expand_path("~", "/tmp/gumby/ddd").should eq(home)
         File.expand_path("~/a", "/tmp/gumby/ddd").should eq(File.join([home, "a"]))
-      ensure
-        ENV["HOME"] = prev_home
       end
-    end
 
-    it "converts a pathname to an absolute pathname, using ~ (home) as base (HOME=/)" do
-      prev_home = home
-      begin
-        ENV["HOME"] = "/"
-        File.expand_path("~/").should eq(home)
-        File.expand_path("~/..badfilename").should eq(File.join(home, "..badfilename"))
-        File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(%r{\A//}, "/"))
-        File.expand_path("~/a", "~/b").should eq(File.join(home, "a"))
-        File.expand_path("~").should eq(home)
-        File.expand_path("~", "/tmp/gumby/ddd").should eq(home)
-        File.expand_path("~/a", "/tmp/gumby/ddd").should eq(File.join([home, "a"]))
-      ensure
-        ENV["HOME"] = prev_home
+      it "converts a pathname to an absolute pathname, using ~ (home) as base (trailing /)" do
+        prev_home = home
+        begin
+          ENV["HOME"] = __DIR__ + "/"
+          File.expand_path("~/").should eq(home)
+          File.expand_path("~/..badfilename").should eq(File.join(home, "..badfilename"))
+          File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(\%r(\A//), "/"))
+          File.expand_path("~/a", "~/b").should eq(File.join(home, "a"))
+          File.expand_path("~").should eq(home)
+          File.expand_path("~", "/tmp/gumby/ddd").should eq(home)
+          File.expand_path("~/a", "/tmp/gumby/ddd").should eq(File.join([home, "a"]))
+        ensure
+          ENV["HOME"] = prev_home
+        end
+      end
+
+      it "converts a pathname to an absolute pathname, using ~ (home) as base (HOME=/)" do
+        prev_home = home
+        begin
+          ENV["HOME"] = "/"
+          File.expand_path("~/").should eq(home)
+          File.expand_path("~/..badfilename").should eq(File.join(home, "..badfilename"))
+          File.expand_path("..").should eq("/#{base.split("/")[0...-1].join("/")}".gsub(\%r(\A//), "/"))
+          File.expand_path("~/a", "~/b").should eq(File.join(home, "a"))
+          File.expand_path("~").should eq(home)
+          File.expand_path("~", "/tmp/gumby/ddd").should eq(home)
+          File.expand_path("~/a", "/tmp/gumby/ddd").should eq(File.join([home, "a"]))
+        ensure
+          ENV["HOME"] = prev_home
+        end
       end
     end
-  end
+  {% end %}
 
   describe "real_path" do
     it "expands paths for normal files" do
-      File.real_path("/usr/share").should eq("/usr/share")
-      File.real_path("/usr/share/..").should eq("/usr")
+      {% if flag?(:win32) %}
+        File.real_path("/usr/share").should eq("C:\\usr\\share")
+        File.real_path("/usr/share/..").should eq("C:\\usr")
+      {% else %}
+        File.real_path("/usr/share").should eq("/usr/share")
+        File.real_path("/usr/share/..").should eq("/usr")
+      {% end %}
     end
 
     it "raises Errno if file doesn't exist" do
@@ -584,18 +620,20 @@ describe "File" do
       end
     end
 
-    it "expands paths of symlinks" do
-      symlink_path = "/tmp/test_file_symlink.txt"
-      file_path = "#{__DIR__}/data/test_file.txt"
-      begin
-        File.symlink(file_path, symlink_path)
-        real_symlink_path = File.real_path(symlink_path)
-        real_file_path = File.real_path(file_path)
-        real_symlink_path.should eq(real_file_path)
-      ensure
-        File.delete(symlink_path) if File.exists?(symlink_path)
+    {% unless flag?(:win32) %}
+      it "expands paths of symlinks" do
+        symlink_path = "#{__DIR__}/data/test_file_symlink.txt"
+        file_path = "#{__DIR__}/data/test_file.txt"
+        begin
+          File.symlink(file_path, symlink_path)
+          real_symlink_path = File.real_path(symlink_path)
+          real_file_path = File.real_path(file_path)
+          real_symlink_path.should eq(real_file_path)
+        ensure
+          File.delete(symlink_path) if File.exists?(symlink_path)
+        end
       end
-    end
+    {% end %}
   end
 
   describe "write" do
@@ -668,7 +706,11 @@ describe "File" do
     filename = "#{__DIR__}/data/temp_write.txt"
     perm = 0o600
     File.open(filename, "w", perm) do |file|
-      file.info.permissions.should eq(perm)
+      {% if flag?(:win32) %}
+        file.info.permissions.should eq(0o666)
+      {% else %}
+        file.info.permissions.should eq(perm)
+      {% end %}
     end
     File.delete filename
   end
@@ -677,7 +719,11 @@ describe "File" do
     filename = "#{__DIR__}/data/temp_write.txt"
     perm = File::Permissions.flags(OwnerRead, OwnerWrite)
     File.open(filename, "w", perm) do |file|
-      file.info.permissions.should eq(perm)
+      {% if flag?(:win32) %}
+        file.info.permissions.should eq(0o666)
+      {% else %}
+        file.info.permissions.should eq(perm)
+      {% end %}
     end
     File.delete filename
   end
@@ -800,64 +846,66 @@ describe "File" do
     end
   end
 
-  describe "flock" do
-    it "exlusively locks a file" do
-      File.open(__FILE__) do |file1|
-        File.open(__FILE__) do |file2|
-          file1.flock_exclusive do
-            # BUG: check for EWOULDBLOCK when exception filters are implemented
-            expect_raises(Errno) do
-              file2.flock_exclusive(blocking: false) { }
+  {% unless flag?(:win32) %}
+    describe "flock" do
+      it "exlusively locks a file" do
+        File.open(__FILE__) do |file1|
+          File.open(__FILE__) do |file2|
+            file1.flock_exclusive do
+              # BUG: check for EWOULDBLOCK when exception filters are implemented
+              expect_raises(Errno) do
+                file2.flock_exclusive(blocking: false) { }
+              end
+            end
+          end
+        end
+      end
+
+      it "shared locks a file" do
+        File.open(__FILE__) do |file1|
+          File.open(__FILE__) do |file2|
+            file1.flock_shared do
+              file2.flock_shared(blocking: false) { }
             end
           end
         end
       end
     end
 
-    it "shared locks a file" do
-      File.open(__FILE__) do |file1|
-        File.open(__FILE__) do |file2|
-          file1.flock_shared do
-            file2.flock_shared(blocking: false) { }
+    it "reads at offset" do
+      filename = "#{__DIR__}/data/test_file.txt"
+      file = File.open(filename)
+      file.read_at(6, 100) do |io|
+        io.gets_to_end.should eq("World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello Worl")
+      end
+      file.read_at(0, 240) do |io|
+        io.gets_to_end.should eq(File.read(filename))
+      end
+    end
+
+    it "raises when reading at offset outside of bounds" do
+      filename = "#{__DIR__}/data/temp_write.txt"
+      File.write(filename, "hello world")
+
+      begin
+        File.open(filename) do |io|
+          expect_raises(ArgumentError, "Negative bytesize") do
+            io.read_at(3, -1) { }
+          end
+
+          expect_raises(ArgumentError, "Offset out of bounds") do
+            io.read_at(12, 1) { }
+          end
+
+          expect_raises(ArgumentError, "Bytesize out of bounds") do
+            io.read_at(6, 6) { }
           end
         end
+      ensure
+        File.delete(filename)
       end
     end
-  end
-
-  it "reads at offset" do
-    filename = "#{__DIR__}/data/test_file.txt"
-    file = File.open(filename)
-    file.read_at(6, 100) do |io|
-      io.gets_to_end.should eq("World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello World\nHello Worl")
-    end
-    file.read_at(0, 240) do |io|
-      io.gets_to_end.should eq(File.read(filename))
-    end
-  end
-
-  it "raises when reading at offset outside of bounds" do
-    filename = "#{__DIR__}/data/temp_write.txt"
-    File.write(filename, "hello world")
-
-    begin
-      File.open(filename) do |io|
-        expect_raises(ArgumentError, "Negative bytesize") do
-          io.read_at(3, -1) { }
-        end
-
-        expect_raises(ArgumentError, "Offset out of bounds") do
-          io.read_at(12, 1) { }
-        end
-
-        expect_raises(ArgumentError, "Bytesize out of bounds") do
-          io.read_at(6, 6) { }
-        end
-      end
-    ensure
-      File.delete(filename)
-    end
-  end
+  {% end %}
 
   describe "raises on null byte" do
     it_raises_on_null_byte "new" do
@@ -965,46 +1013,48 @@ describe "File" do
     end
   end
 
-  describe "encoding" do
-    it "writes with encoding" do
-      filename = "#{__DIR__}/data/temp_write.txt"
-      File.write(filename, "hello", encoding: "UCS-2LE")
-      File.read(filename).to_slice.should eq("hello".encode("UCS-2LE"))
-      File.delete(filename)
-    end
-
-    it "reads with encoding" do
-      filename = "#{__DIR__}/data/temp_write.txt"
-      File.write(filename, "hello", encoding: "UCS-2LE")
-      File.read(filename, encoding: "UCS-2LE").should eq("hello")
-      File.delete(filename)
-    end
-
-    it "opens with encoding" do
-      filename = "#{__DIR__}/data/temp_write.txt"
-      File.write(filename, "hello", encoding: "UCS-2LE")
-      File.open(filename, encoding: "UCS-2LE") do |file|
-        file.gets_to_end.should eq("hello")
+  {% unless flag?(:win32) %}
+    describe "encoding" do
+      it "writes with encoding" do
+        filename = "#{__DIR__}/data/temp_write.txt"
+        File.write(filename, "hello", encoding: "UCS-2LE")
+        File.read(filename).to_slice.should eq("hello".encode("UCS-2LE"))
+        File.delete(filename)
       end
-      File.delete filename
-    end
 
-    it "does each line with encoding" do
-      filename = "#{__DIR__}/data/temp_write.txt"
-      File.write(filename, "hello", encoding: "UCS-2LE")
-      File.each_line(filename, encoding: "UCS-2LE") do |line|
-        line.should eq("hello")
+      it "reads with encoding" do
+        filename = "#{__DIR__}/data/temp_write.txt"
+        File.write(filename, "hello", encoding: "UCS-2LE")
+        File.read(filename, encoding: "UCS-2LE").should eq("hello")
+        File.delete(filename)
       end
-      File.delete filename
-    end
 
-    it "reads lines with encoding" do
-      filename = "#{__DIR__}/data/temp_write.txt"
-      File.write(filename, "hello", encoding: "UCS-2LE")
-      File.read_lines(filename, encoding: "UCS-2LE").should eq(["hello"])
-      File.delete filename
+      it "opens with encoding" do
+        filename = "#{__DIR__}/data/temp_write.txt"
+        File.write(filename, "hello", encoding: "UCS-2LE")
+        File.open(filename, encoding: "UCS-2LE") do |file|
+          file.gets_to_end.should eq("hello")
+        end
+        File.delete filename
+      end
+
+      it "does each line with encoding" do
+        filename = "#{__DIR__}/data/temp_write.txt"
+        File.write(filename, "hello", encoding: "UCS-2LE")
+        File.each_line(filename, encoding: "UCS-2LE") do |line|
+          line.should eq("hello")
+        end
+        File.delete filename
+      end
+
+      it "reads lines with encoding" do
+        filename = "#{__DIR__}/data/temp_write.txt"
+        File.write(filename, "hello", encoding: "UCS-2LE")
+        File.read_lines(filename, encoding: "UCS-2LE").should eq(["hello"])
+        File.delete filename
+      end
     end
-  end
+  {% end %}
 
   describe "closed stream" do
     it "raises if writing on a closed stream" do

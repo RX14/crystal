@@ -1,3 +1,5 @@
+{% skip_file if flag?(:win32) %}
+
 # :nodoc:
 class File::PReader < IO
   include IO::Buffered
