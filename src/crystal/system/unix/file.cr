@@ -70,26 +70,64 @@ module Crystal::System::File
     tmpdir.rchop(::File::SEPARATOR)
   end
 
-  def self.stat?(path : String) : ::File::Stat?
-    if LibC.stat(path.check_no_null_byte, out stat) != 0
+  def self.info?(path : String, follow_symlinks : Bool) : ::File::Info?
+    stat = uninitialized LibC::Stat
+    if follow_symlinks
+      ret = LibC.stat(path.check_no_null_byte, pointerof(stat))
+    else
+      ret = LibC.lstat(path.check_no_null_byte, pointerof(stat))
+    end
+
+    if ret == 0
+      to_file_info(stat)
+    else
       if {Errno::ENOENT, Errno::ENOTDIR}.includes? Errno.value
         return nil
       else
-        raise Errno.new("Unable to get stat for '#{path}'")
+        raise Errno.new("Unable to get info for '#{path}'")
       end
     end
-    ::File::Stat.new(stat)
   end
 
-  def self.lstat?(path : String) : ::File::Stat?
-    if LibC.lstat(path.check_no_null_byte, out stat) != 0
-      if {Errno::ENOENT, Errno::ENOTDIR}.includes? Errno.value
-        return nil
-      else
-        raise Errno.new("Unable to get lstat for '#{path}'")
-      end
+  def self.to_file_info(stat)
+    size = stat.st_size.to_u64
+
+    permissions = ::File::Permissions.new((stat.st_mode & 0o777).to_i16)
+
+    case stat.st_mode & LibC::S_IFMT
+    when LibC::S_IFBLK
+      type = ::File::Type::BlockDevice
+    when LibC::S_IFCHR
+      type = ::File::Type::CharacterDevice
+    when LibC::S_IFDIR
+      type = ::File::Type::Directory
+    when LibC::S_IFIFO
+      type = ::File::Type::Pipe
+    when LibC::S_IFLNK
+      type = ::File::Type::Symlink
+    when LibC::S_IFREG
+      type = ::File::Type::File
+    when LibC::S_IFSOCK
+      type = ::File::Type::Socket
+    else
+      raise "BUG: unknown File::Type"
     end
-    ::File::Stat.new(stat)
+
+    flags = ::File::Flags::None
+    flags |= ::File::Flags::SetUser if stat.st_mode.bits_set? LibC::S_ISUID
+    flags |= ::File::Flags::SetGroup if stat.st_mode.bits_set? LibC::S_ISGID
+    flags |= ::File::Flags::Sticky if stat.st_mode.bits_set? LibC::S_ISVTX
+
+    modification_time = {% if flag?(:darwin) %}
+                          ::Time.new(stat.st_mtimespec, ::Time::Location::UTC)
+                        {% else %}
+                          ::Time.new(stat.st_mtim, ::Time::Location::UTC)
+                        {% end %}
+
+    owner = stat.st_uid.to_u32
+    group = stat.st_gid.to_u32
+
+    ::File::Info.new(size, permissions, type, flags, modification_time, owner, group)
   end
 
   def self.exists?(path)
@@ -121,7 +159,7 @@ module Crystal::System::File
     raise Errno.new("Error changing owner of '#{path}'") if ret == -1
   end
 
-  def self.chmod(path, mode : Int)
+  def self.chmod(path, mode)
     if LibC.chmod(path, mode) == -1
       raise Errno.new("Error changing permissions of '#{path}'")
     end
