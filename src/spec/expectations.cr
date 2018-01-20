@@ -326,6 +326,11 @@ module Spec
     #
     # It returns the rescued exception.
     def expect_raises(klass : T.class, message = nil, file = __FILE__, line = __LINE__) forall T
+      {% if flag?(:win32) %}
+        puts "Skipped expect_raises assertion at #{file}:#{line}"
+        return
+      {% end %}
+
       yield
     rescue ex : T
       # We usually bubble Spec::AssertaionFailed, unless this is the expected exception

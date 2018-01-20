@@ -47,7 +47,9 @@ describe "Dir" do
       ex = expect_raises(Errno, /Error determining size of/) do
         Dir.empty?(datapath("dir", "f1.txt", "/"))
       end
-      ex.errno.should eq(Errno::ENOTDIR)
+      {% unless flag?(:win32) %}
+        ex.errno.should eq(Errno::ENOTDIR)
+      {% end %}
     end
   end
 

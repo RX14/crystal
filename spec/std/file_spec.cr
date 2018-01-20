@@ -114,7 +114,9 @@ describe "File" do
       ex = expect_raises(Errno, /Error determining size/) do
         File.empty?(datapath("test_file.txt", ""))
       end
-      ex.errno.should eq(Errno::ENOTDIR)
+      {% unless flag?(:win32) %}
+        ex.errno.should eq(Errno::ENOTDIR)
+      {% end %}
     end
   end
 
@@ -472,7 +474,9 @@ describe "File" do
       ex = expect_raises(Errno, /Error determining size/) do
         File.size(datapath("test_file.txt", ""))
       end
-      ex.errno.should eq(Errno::ENOTDIR)
+      {% unless flag?(:win32) %}
+        ex.errno.should eq(Errno::ENOTDIR)
+      {% end %}
     end
   end
 
