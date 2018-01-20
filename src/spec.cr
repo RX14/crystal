@@ -88,10 +88,12 @@ OptionParser.parse! do |opts|
       exit 1
     end
   end
-  opts.on("--junit_output OUTPUT_DIR", "generate JUnit XML output") do |output_dir|
-    junit_formatter = Spec::JUnitFormatter.file(output_dir)
-    Spec.add_formatter(junit_formatter)
-  end
+  {% unless flag?(:win32) %}
+    opts.on("--junit_output OUTPUT_DIR", "generate JUnit XML output") do |output_dir|
+      junit_formatter = Spec::JUnitFormatter.file(output_dir)
+      Spec.add_formatter(junit_formatter)
+    end
+  {% end %}
   opts.on("--help", "show this help") do |pattern|
     puts opts
     exit
@@ -115,6 +117,8 @@ if ENV["SPEC_VERBOSE"]? == "1"
   Spec.override_default_formatter(Spec::VerboseFormatter.new)
 end
 
-Signal::INT.trap { Spec.abort! }
+{% unless flag?(:win32) %}
+  Signal::INT.trap { Spec.abort! }
+{% end %}
 
 Spec.run

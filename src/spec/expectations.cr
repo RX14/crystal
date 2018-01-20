@@ -289,9 +289,13 @@ module Spec
     macro expect_raises(klass, message, file = __FILE__, line = __LINE__)
       %failed = false
       begin
-        {{yield}}
-        %failed = true
-        fail "Expected {{klass.id}} but nothing was raised", {{file}}, {{line}}
+        {% if flag?(:win32) %}
+          puts "Skipped expect_raises assertion at {{file.id}}:{{line.id}}"
+        {% else %}
+          {{yield}}
+          %failed = true
+          fail "Expected {{klass.id}} but nothing was raised", {{file}}, {{line}}
+        {% end %}
       rescue %ex : {{klass.id}}
         # We usually bubble Spec::AssertaionFailed, unless this is the expected exception
         if %ex.class == Spec::AssertionFailed && {{klass}} != Spec::AssertionFailed
