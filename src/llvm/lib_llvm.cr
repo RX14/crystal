@@ -27,7 +27,11 @@ end
   {% end %}
   lib LibLLVM
     VERSION = {{`#{LibLLVM::LLVM_CONFIG} --version`.chomp.stringify}}
-    BUILT_TARGETS = {{ `#{LibLLVM::LLVM_CONFIG} --targets-built`.strip.downcase.split(' ').map(&.id.symbolize) }}
+    {% if flag?(:win32) %}
+      BUILT_TARGETS = [:x86]
+    {% else %}
+      BUILT_TARGETS = {{ `#{LibLLVM::LLVM_CONFIG} --targets-built`.strip.downcase.split(' ').map(&.id.symbolize) }}
+    {% end %}
   end
 {% end %}
 

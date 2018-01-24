@@ -1,6 +1,5 @@
 require "option_parser"
 require "file_utils"
-require "socket"
 require "colorize"
 require "digest/md5"
 
@@ -391,55 +390,59 @@ module Crystal
     end
 
     private def codegen_many_units(program, units, target_triple)
-      jobs_count = 0
-      all_reused = [] of String
-      wait_channel = Channel(Array(String)).new(@n_threads)
+      {% if flag?(:win32) %}
+        raise NotImplementedError.new("Only --single-module is supported on win32")
+      {% else %}
+        jobs_count = 0
+        all_reused = [] of String
+        wait_channel = Channel(Array(String)).new(@n_threads)
 
-      units.each_slice(Math.max(units.size / @n_threads, 1)) do |slice|
-        jobs_count += 1
-        spawn do
-          # For stats output we want to count how many previous
-          # .o files were reused, mainly to detect performance regressions.
-          # Because we fork, we must communicate using a pipe.
-          reused = [] of String
-          if @progress_tracker.stats? || @progress_tracker.progress?
-            pr, pw = IO.pipe
-            spawn do
-              pr.each_line do |line|
-                unit = JSON.parse(line)
-                reused << unit["name"].as_s if unit["reused"].as_bool
-                @progress_tracker.stage_progress += 1
+        units.each_slice(Math.max(units.size / @n_threads, 1)) do |slice|
+          jobs_count += 1
+          spawn do
+            # For stats output we want to count how many previous
+            # .o files were reused, mainly to detect performance regressions.
+            # Because we fork, we must communicate using a pipe.
+            reused = [] of String
+            if @progress_tracker.stats? || @progress_tracker.progress?
+              pr, pw = IO.pipe
+              spawn do
+                pr.each_line do |line|
+                  unit = JSON.parse(line)
+                  reused << unit["name"].as_s if unit["reused"].as_bool
+                  @progress_tracker.stage_progress += 1
+                end
               end
             end
-          end
 
-          codegen_process = fork do
-            pipe_w = pw
-            slice.each do |unit|
-              unit.compile
-              if pipe_w
-                unit_json = {name: unit.name, reused: unit.reused_previous_compilation?}.to_json
-                pipe_w.puts unit_json
+            codegen_process = fork do
+              pipe_w = pw
+              slice.each do |unit|
+                unit.compile
+                if pipe_w
+                  unit_json = {name: unit.name, reused: unit.reused_previous_compilation?}.to_json
+                  pipe_w.puts unit_json
+                end
               end
             end
-          end
-          codegen_process.wait
+            codegen_process.wait
 
-          if pipe_w = pw
-            pipe_w.close
-            Fiber.yield
-          end
+            if pipe_w = pw
+              pipe_w.close
+              Fiber.yield
+            end
 
-          wait_channel.send reused
+            wait_channel.send reused
+          end
         end
-      end
 
-      jobs_count.times do
-        reused = wait_channel.receive
-        all_reused.concat(reused)
-      end
+        jobs_count.times do
+          reused = wait_channel.receive
+          all_reused.concat(reused)
+        end
 
-      all_reused
+        all_reused
+      {% end %}
     end
 
     private def print_macro_run_stats(program)

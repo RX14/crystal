@@ -73,7 +73,13 @@ module Crystal
       ]
       candidates = candidates
         .compact
-        .map { |file| File.expand_path(file) }
+        .map do |file|
+          {% if flag?(:win32) %}
+            file
+          {% else %}
+            File.expand_path(file)
+          {% end %}
+        end
         .uniq
 
       # Return the first one for which we could create a directory
