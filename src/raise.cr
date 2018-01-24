@@ -48,6 +48,9 @@ end
   def raise(exception : Exception) : NoReturn
     puts
     puts "Attempting to raise: "
+    # if exception.is_a?(Crystal::SyntaxException)
+    #   exception.append_to_s("", STDOUT)
+    # end
     exception.inspect_with_backtrace(STDOUT)
 
     __crystal_raise(pointerof(exception).as(Void*))

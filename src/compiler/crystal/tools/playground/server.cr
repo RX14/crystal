@@ -1,3 +1,5 @@
+{% skip_file if flag?(:win32) %}
+
 require "http/server"
 require "tempfile"
 require "logger"
