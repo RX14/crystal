@@ -185,14 +185,20 @@ def abort(message, status = 1) : NoReturn
 end
 
 class Process
+  @@after_fork_child_callbacks : Array(-> Nil)?
+
   # Hooks are defined here due to load order problems.
   def self.after_fork_child_callbacks
-    @@after_fork_child_callbacks ||= [
-      ->Scheduler.after_fork,
-      ->Event::SignalHandler.after_fork,
-      ->{ Event::SignalChildHandler.instance.after_fork },
-      ->Random::DEFAULT.new_seed,
-    ] of -> Nil
+    {% begin %}
+      @@after_fork_child_callbacks ||= [
+        {% unless flag?(:win32) %}
+          ->Scheduler.after_fork,
+          ->Event::SignalHandler.after_fork,
+          ->{ Event::SignalChildHandler.instance.after_fork },
+        {% end %}
+        ->Random::DEFAULT.new_seed,
+      ] of -> Nil
+    {% end %}
   end
 end
 

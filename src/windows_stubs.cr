@@ -1,3 +1,5 @@
+{% skip_file unless flag?(:win32) %}
+
 require "c/synchapi"
 
 struct CallStack
@@ -64,6 +66,10 @@ class Process
   def self.exit(status = 0)
     LibC.exit(status)
   end
+end
+
+enum Signal
+  KILL = 0
 end
 
 def sleep(seconds : Number)

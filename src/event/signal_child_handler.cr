@@ -50,7 +50,7 @@ class Event::SignalChildHandler
     end
   end
 
-  # Returns a future that sends a `Process::Status` or raises after forking.
+  # Waits for *pid* to exit, returning `Process::Status` or raises after forking.
   def waitpid(pid : LibC::PidT)
     chan = ChanType.new(1)
     # BUG: needs mutexes with threads
@@ -61,8 +61,6 @@ class Event::SignalChildHandler
       @waiting[pid] = chan
     end
 
-    lazy do
-      chan.receive || raise Channel::ClosedError.new("waitpid channel closed after forking")
-    end
+    chan.receive || raise Channel::ClosedError.new("waitpid channel closed after forking")
   end
 end
