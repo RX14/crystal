@@ -48,6 +48,28 @@ struct OpenSSL::BIO
       1
     end
 
+    bputs = LibCrypto::BioMethodPuts.new do |bio, cstr|
+      io = Box(IO).unbox(BIO.get_data(bio))
+
+      len = LibC.strlen(cstr)
+      io.write Slice.new(cstr, len)
+      LibC::Int.new(len)
+    end
+
+    bgets = LibCrypto::BioMethodGets.new do |bio, buffer, len|
+      io = Box(IO).unbox(BIO.get_data(bio))
+      io.flush
+
+      str = io.gets('\n', limit: len - 1)
+      return 0 unless str
+
+      read_slice = Slice.new(buffer, len)
+      str.to_slice.copy_to(read_slice)
+      read_slice[str.bytesize] = 0
+
+      str.bytesize
+    end
+
     ctrl = LibCrypto::BioMethodCtrl.new do |bio, cmd, num, ptr|
       io = Box(IO).unbox(BIO.get_data(bio))
 
@@ -97,6 +119,8 @@ struct OpenSSL::BIO
         LibCrypto.BIO_meth_set_read(biom, bread)
       {% end %}
 
+      LibCrypto.BIO_meth_set_puts(biom, bputs)
+      LibCrypto.BIO_meth_set_gets(biom, bgets)
       LibCrypto.BIO_meth_set_ctrl(biom, ctrl)
       LibCrypto.BIO_meth_set_create(biom, create)
       LibCrypto.BIO_meth_set_destroy(biom, destroy)
@@ -107,6 +131,8 @@ struct OpenSSL::BIO
       biom.value.name = "Crystal BIO"
       biom.value.bwrite = bwrite
       biom.value.bread = bread
+      biom.value.bputs = bputs
+      biom.value.bgets = bgets
       biom.value.ctrl = ctrl
       biom.value.create = create
       biom.value.destroy = destroy
