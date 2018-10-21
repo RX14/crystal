@@ -83,7 +83,11 @@ struct OpenSSL::BIO
     end
 
     {% if compare_versions(LibCrypto::OPENSSL_VERSION, "1.1.0") >= 0 %}
-      biom = LibCrypto.BIO_meth_new(Int32::MAX, "Crystal BIO")
+      bio_index = LibCrypto.BIO_get_new_index
+      raise "Error getting BIO index" if bio_index == -1
+      bio_index |= LibCrypto::BIO_TYPE_SOURCE_SINK
+
+      biom = LibCrypto.BIO_meth_new(bio_index, "Crystal BIO")
 
       {% if compare_versions(LibCrypto::OPENSSL_VERSION, "1.1.1") >= 0 %}
         LibCrypto.BIO_meth_set_write_ex(biom, bwrite_ex)

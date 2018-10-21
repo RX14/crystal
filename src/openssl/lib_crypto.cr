@@ -91,6 +91,9 @@ lib LibCrypto
   fun BIO_set_shutdown(Bio*, Int)
 
   {% if compare_versions(LibCrypto::OPENSSL_VERSION, "1.1.0") >= 0 %}
+    BIO_TYPE_SOURCE_SINK = 0x0400
+
+    fun BIO_get_new_index : Int
     fun BIO_meth_new(Int, Char*) : BioMethod*
     fun BIO_meth_set_read(BioMethod*, BioMethodReadOld)
     fun BIO_meth_set_write(BioMethod*, BioMethodWriteOld)
