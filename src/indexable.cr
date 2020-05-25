@@ -509,6 +509,7 @@ module Indexable(T)
 
   # Same as `#each`, but works in reverse.
   def reverse_each(&block) : Nil
+    return if empty?
     (size - 1).downto(0) do |i|
       yield unsafe_fetch(i)
     end
