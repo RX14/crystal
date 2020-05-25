@@ -545,8 +545,11 @@ module Indexable(T)
   # [1, 2, 3, 2, 3].rindex(offset: 2) { |x| x < 3 } # => 1
   # ```
   def rindex(offset = size - 1)
-    offset += size if offset < 0
-    return nil if offset >= size
+    # FIXME(1.0): https://github.com/crystal-lang/crystal/issues/9277
+    offset_i64 = offset.to_i64
+    offset_i64 += size if offset < 0
+    return nil if offset_i64 >= size
+    offset = offset.class.new(offset_i64)
 
     offset.downto(0) do |i|
       if yield unsafe_fetch(i)
@@ -585,9 +588,11 @@ module Indexable(T)
   end
 
   private def check_index_out_of_bounds(index)
-    index += size if index < 0
-    if 0 <= index < size
-      index
+    # FIXME(1.0): https://github.com/crystal-lang/crystal/issues/9277
+    i64_index = index.to_i64
+    i64_index += size if i64_index < 0
+    if 0 <= i64_index < size
+      index.class.new(i64_index)
     else
       yield
     end

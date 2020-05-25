@@ -186,6 +186,8 @@ struct Slice(T)
   def []=(index : Int, value : T)
     check_writable
 
+    # FIXME(1.0): https://github.com/crystal-lang/crystal/issues/9277
+    index = index.to_i64
     index += size if index < 0
     unless 0 <= index < size
       raise IndexError.new
@@ -740,6 +742,8 @@ struct Slice(T)
 
   # :nodoc:
   def fast_index(object, offset)
+    # FIXME(1.0): https://github.com/crystal-lang/crystal/issues/9277
+    offset = offset.to_i64
     offset += size if offset < 0
     if 0 <= offset < size
       result = LibC.memchr(to_unsafe + offset, object, size - offset)

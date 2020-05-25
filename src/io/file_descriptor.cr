@@ -82,8 +82,10 @@ class IO::FileDescriptor < IO
     check_open
 
     flush
-    offset -= @in_buffer_rem.size if whence.current?
 
+    # FIXME(1.0): https://github.com/crystal-lang/crystal/issues/9277
+    offset = offset.to_i64
+    offset -= @in_buffer_rem.size if whence.current?
     system_seek(offset, whence)
 
     @in_buffer_rem = Bytes.empty
