@@ -141,7 +141,24 @@ module Crystal
         return exp.transform(self)
       end
 
-      exps = [] of ASTNode
+      # This is a fast case for the recusion defined in `flatten_collect` below.
+      # Works in about 99% of cases and avoids allocating a new array.
+      unless node.expressions.any?(&.single_expression.is_a?(Expressions))
+        exprs = node.expressions
+
+        exprs.each_with_index do |exp, i|
+          exprs[i] = exp.transform(self).single_expression
+
+          if exp.is_a?(Break) || exp.is_a?(Next) || exp.is_a?(Return) || exp.no_returns?
+            exprs.delete_at(i + 1, exprs.size - i - 1)
+            break
+          end
+        end
+
+        return node
+      end
+
+      exps = Array(ASTNode).new(node.expressions.size)
 
       node.expressions.each_with_index do |exp, i|
         new_exp = exp.transform(self)
